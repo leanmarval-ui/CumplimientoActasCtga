@@ -1,0 +1,63 @@
+name: Procesar reuniones proyectos
+ 
+on:
+
+  push:
+
+    paths:
+
+      - "input/Reuniones.xlsx"
+ 
+jobs:
+ 
+  procesar:
+ 
+    runs-on: ubuntu-latest
+ 
+    steps:
+ 
+      - name: Clonar repositorio
+
+        uses: actions/checkout@v4
+ 
+      - name: Instalar Python
+
+        uses: actions/setup-python@v5
+
+        with:
+
+          python-version: "3.11"
+ 
+      - name: Instalar dependencias
+
+        run: |
+
+          pip install pandas numpy openpyxl matplotlib
+ 
+      - name: Ejecutar script de procesamiento
+
+        run: |
+
+          python scripts/main.py
+ 
+      - name: Verificar archivos generados
+
+        run: |
+
+          echo "Contenido carpeta output:"
+
+          ls -la output
+ 
+      - name: Guardar resultados en el repositorio
+
+        run: |
+
+          git config user.name "github-actions"
+
+          git config user.email "github-actions@github.com"
+
+          git add output/*
+
+          git diff --cached --quiet || git commit -m "Actualizar resultados reuniones"
+
+          git push
