@@ -12,7 +12,7 @@ print("Leyendo archivo...")
 # =========================
 # LECTURA DE ARCHIVOS
 # =========================
-df_proyectos = pd.read_excel(archivo, sheet_name="ProyectosBGA")
+df_proyectos = pd.read_excel(archivo, sheet_name="ProyectosCtga")
 df_intermedia = pd.read_excel(archivo, sheet_name="ReunionesIntermedias")
 df_semanal = pd.read_excel(archivo, sheet_name="ReunionesSemanales")
 
