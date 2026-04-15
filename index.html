@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Cumplimiento</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        background-color: #f4f6f8;
+    }
+
+    #splash {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background: #2c3e50;
+        color: white;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 28px;
+        z-index: 999;
+    }
+
+    .contenido {
+        padding: 20px;
+        display: none;
+    }
+
+    h1 {
+        text-align: center;
+    }
+
+    /* KPI */
+    .kpi-container {
+        display: flex;
+        justify-content: space-around;
+        margin: 20px 0;
+        flex-wrap: wrap;
+    }
+
+    .kpi {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    width: 200px;
+    margin: 10px;
+    }
+
+    /* 🎨 COLORES KPI */
+    .kpi:nth-child(2) { border-top: 5px solid #27ae60; } /* verde */
+    .kpi:nth-child(3) { border-top: 5px solid #f1c40f; } /* amarillo */
+    .kpi:nth-child(4) { border-top: 5px solid #c0392b; } /* rojo */
+
+    .kpi h2 {
+        margin: 0;
+        font-size: 28px;
+    }
+
+    .kpi p {
+        margin: 5px 0 0;
+        color: #666;
+    }
+
+    /* BUSCADOR */
+    .buscador {
+        text-align: center;
+        margin: 20px;
+    }
+
+    input {
+        padding: 10px;
+        width: 300px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+    }
+
+    /* CARD */
+    .card {
+        background: white;
+        padding: 10px;
+        border-radius: 10px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        text-align: center;
+        max-width: 800px;
+        margin: auto;
+    }
+
+    img {
+        width: 100%;
+        max-height: 600px;
+        object-fit: contain;
+    }
+
+    /* TABLA */
+    table {
+        margin: auto;
+        border-collapse: collapse;
+        background: white;
+        width: 95%;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    th {
+        background: #2c3e50;
+        color: white;
+        padding: 10px;
+    }
+
+    td {
+        padding: 8px;
+        text-align: center;
+    }
+    
+    .card.grafico {
+    max-width: 1200px; /* 🔥 más ancho */
+    width: 95%;
+    }
+    
+</style>
+</head>
+
+<body>
+
+<div id="splash">
+    🚀 Cargando Dashboard...
+</div>
+
+<div class="contenido" id="contenido">
+
+<h1>📊 Cumplimiento de Actas - Cartagena</h1>
+
+<!-- KPI -->
+<div class="kpi-container" id="kpis"></div>
+
+<!-- BUSCADOR -->
+<div class="buscador">
+    <input list="listaProyectos" id="buscador" placeholder="Buscar proyecto...">
+    <datalist id="listaProyectos"></datalist>
+</div>
+
+<!-- GRAFICA -->
+<div class="card grafico">
+    <img src="https://leanmarval-ui.github.io/CumplimientoActasCtga/output/grafico.png">
+</div>
+
+<!-- TABLA -->
+<div id="tabla-container" style="margin-top:40px;"></div>
+
+</div>
+
+<script>
+setTimeout(() => {
+    document.getElementById("splash").style.display = "none";
+    document.getElementById("contenido").style.display = "block";
+}, 1500);
+</script>
+
+<script>
+
+let datosGlobal = [];
+
+fetch('https://leanmarval-ui.github.io/CumplimientoActasCtga/output/detalle.json')
+.then(res => res.json())
+.then(data => {
+
+    datosGlobal = data.filter(d => d.sucursal === "cartagena");
+
+    // 🔥 LLENAR DESPLEGABLE
+    let proyectosUnicos = [...new Set(datosGlobal.map(d => d.proyecto))];
+    let opciones = proyectosUnicos.map(p => `<option value="${p}">`).join("");
+    document.getElementById("listaProyectos").innerHTML = opciones;
+
+    let buscador = document.getElementById("buscador");
+
+    buscador.addEventListener("input", filtrarTabla);
+    buscador.addEventListener("change", filtrarTabla);
+
+    function filtrarTabla(){
+        let texto = buscador.value.toLowerCase();
+
+        let filtrado = datosGlobal.filter(d =>
+            d.proyecto.toLowerCase().includes(texto)
+        );
+
+        renderTabla(filtrado);
+    }
+
+    generarKPIs(datosGlobal);
+    renderTabla(datosGlobal);
+});
+
+// ================= KPI =================
+function generarKPIs(data){
+
+    let cumplimientos = data.map(d => d.cumplimiento * 100);
+
+    let promedio = cumplimientos.reduce((a,b)=>a+b,0)/cumplimientos.length;
+
+    let verdes = cumplimientos.filter(v => v >= 90).length;
+    let amarillos = cumplimientos.filter(v => v >= 80 && v < 90).length;
+    let rojos = cumplimientos.filter(v => v < 80).length;
+
+   document.getElementById("kpis").innerHTML = `
+    <div class="kpi">
+        <h2>${promedio.toFixed(0)}%</h2>
+        <p>Promedio</p>
+    </div>
+
+    <div class="kpi">
+        <h2>${verdes}</h2>
+        <p>Cumplimiento Óptimo (≥90%)</p>
+    </div>
+
+    <div class="kpi">
+        <h2>${amarillos}</h2>
+        <p>Cumplimiento Medio (80–89%)</p>
+    </div>
+
+    <div class="kpi">
+        <h2>${rojos}</h2>
+        <p>Cumplimiento Crítico (&lt;80%)</p>
+    </div>
+`;
+}
+
+// ================= TABLA =================
+function renderTabla(data){
+
+    // ORDENAR (peor primero)
+    data.sort((a,b)=> a.cumplimiento - b.cumplimiento);
+
+    let html = `
+<table>
+    <tr>
+        <th>Proyecto</th>
+        <th>Tipo</th>
+        <th>Día</th>
+        <th>Posible</th>
+        <th>Real</th>
+        <th>Coincidencias</th>
+        <th># Coincidencias</th>
+        <th>Cumplimiento</th>
+    </tr>
+`;
+
+    data.forEach(row => {
+
+        let valor = row.cumplimiento * 100;
+        let color = valor >= 90 ? "#27ae60" : valor >= 80 ? "#f1c40f" : "#c0392b";
+
+        html += `
+        <tr style="background:${valor<80?'#fdecea':valor<90?'#fef9e7':'#eafaf1'}">
+            <td>${row.proyecto}</td>
+            <td>${row.tipo}</td>
+            <td>${row.dia}</td>
+            <td>${row.posible}</td>
+            <td>${row.real}</td>
+            <td>${row.coincidencias}</td>
+            <td>${row.conteo}</td>
+            <td style="color:${color}; font-weight:bold;">
+                ${valor.toFixed(0)}%
+            </td>
+        </tr>
+        `;
+    });
+
+    html += "</table>";
+
+    document.getElementById("tabla-container").innerHTML = html;
+}
+
+// ================= BUSCADOR =================
+let buscador = document.getElementById("buscador");
+
+buscador.addEventListener("input", filtrarTabla);
+buscador.addEventListener("change", filtrarTabla);
+
+function filtrarTabla(){
+
+    let texto = buscador.value.toLowerCase();
+
+    let filtrado = datosGlobal.filter(d =>
+        d.proyecto.toLowerCase().includes(texto)
+    );
+
+    renderTabla(filtrado);
+    generarKPIs(filtrado); // 🔥 KPIs dinámicos
+}
+
+</script>
+
+</body>
+</html>
