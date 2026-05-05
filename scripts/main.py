@@ -12,7 +12,7 @@ print("Leyendo archivo...")
 # =========================
 # LECTURA DE ARCHIVOS
 # =========================
-df_proyectos = pd.read_excel(archivo, sheet_name="ProyectosCtga")
+df_proyectos = pd.read_excel(archivo, sheet_name="ProyectosBquilla")
 df_intermedia = pd.read_excel(archivo, sheet_name="ReunionesIntermedias")
 df_semanal = pd.read_excel(archivo, sheet_name="ReunionesSemanales")
 
@@ -86,5 +86,7 @@ print("Calendarios generados")
 generar_grafico(comparacion)
 
 print("Gráfico actualizado")
+
+print("Proceso finalizado correctamente ✅")
 
 print("Proceso finalizado correctamente ✅")
