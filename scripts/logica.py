@@ -47,12 +47,9 @@ def calcular_posibles(dia_base, fechas_mes):
     for fecha in fechas_mes:
         fecha = pd.to_datetime(fecha).normalize()
 
-        # 👇 SOLO entra si es el día base (ej: martes)
         if fecha.weekday() == numero_dia:
 
-            # ❌ SI ES FESTIVO → NO usar ese día, mover lógica
             if fecha in festivos:
-                # 👇 buscas los siguientes días hábiles (reemplaza la reunión)
                 siguiente = siguiente_habil(fecha)
                 if siguiente.month == MES:
                     posibles.append(siguiente)
@@ -61,7 +58,6 @@ def calcular_posibles(dia_base, fechas_mes):
                     if siguiente_2.month == MES:
                         posibles.append(siguiente_2)
 
-            # ✅ SI NO ES FESTIVO
             else:
                 posibles.append(fecha)
 
@@ -100,19 +96,17 @@ def coincidencias_por_semana(lista_teorica, lista_real):
 
     coincidencias = []
 
-    # 👇 recorrer en pares (inicio, fin)
     for i in range(0, len(teoricas), 2):
 
         try:
             inicio = teoricas[i]
             fin = teoricas[i + 1]
         except IndexError:
-            continue
+            fin = inicio  # ✅ par incompleto: usa inicio como fin
 
-        # 👇 holgura = día siguiente al cierre
-        holgura = fin + timedelta(days=1)
+        # ✅ Sin día extra — ventana exacta inicio a fin
+        holgura = fin
 
-        # 👇 buscar match en ese rango
         match = None
         for r in reales:
             if inicio <= r <= holgura:
@@ -123,12 +117,12 @@ def coincidencias_por_semana(lista_teorica, lista_real):
             coincidencias.append(match)
 
     return ", ".join([f.strftime("%Y-%m-%d") for f in coincidencias])
+
 # =========================
 # PROCESO PRINCIPAL
 # =========================
 def procesar_todo(df_proyectos, df_intermedia, df_semanal, fechas_mes):
 
-    # 🔥 LIMPIAR NOMBRES (AQUÍ)
     df_proyectos["Proyecto"] = df_proyectos["Proyecto"].apply(limpiar_texto)
     df_intermedia["Proyecto"] = df_intermedia["Proyecto"].apply(limpiar_texto)
     df_semanal["Proyecto"] = df_semanal["Proyecto"].apply(limpiar_texto)
@@ -144,20 +138,26 @@ def procesar_todo(df_proyectos, df_intermedia, df_semanal, fechas_mes):
 
     df_proyectos["ConteoIntermedia"] = df_proyectos["PosibleIntermedia"].apply(lambda x: contar_fechas(x) / 2)
     df_proyectos["ConteoSemanal"] = df_proyectos["PosibleSemanal"].apply(lambda x: contar_fechas(x) / 2)
-   
+
     # =========================
     # DETECTAR COLUMNA DE FECHA
     # =========================
-    col_fecha_intermedia = [c for c in df_intermedia.columns if "fecha" in c.lower()][0]
-    col_fecha_semanal = [c for c in df_semanal.columns if "fecha" in c.lower()][0]
+    col_fecha_intermedia = "Fecha de Fin" if "Fecha de Fin" in df_intermedia.columns else [c for c in df_intermedia.columns if "fecha" in c.lower()][0]
+    col_fecha_semanal = "Fecha de Fin" if "Fecha de Fin" in df_semanal.columns else [c for c in df_semanal.columns if "fecha" in c.lower()][0]
 
     # NORMALIZAR
-    df_intermedia[col_fecha_intermedia] = pd.to_datetime(df_intermedia[col_fecha_intermedia]).dt.normalize()
-    df_semanal[col_fecha_semanal] = pd.to_datetime(df_semanal[col_fecha_semanal]).dt.normalize()
+    df_intermedia[col_fecha_intermedia] = pd.to_datetime(
+        df_intermedia[col_fecha_intermedia], errors="coerce"
+    ).dt.normalize()
 
-    # =========================
+    df_semanal[col_fecha_semanal] = pd.to_datetime(
+        df_semanal[col_fecha_semanal], errors="coerce"
+    ).dt.normalize()
+
+    df_intermedia = df_intermedia.dropna(subset=[col_fecha_intermedia])
+    df_semanal = df_semanal.dropna(subset=[col_fecha_semanal])
+
     # FILTRAR SOLO MES ANALIZADO
-    # =========================
     df_intermedia = df_intermedia[
         (df_intermedia[col_fecha_intermedia].dt.year == ANIO) &
         (df_intermedia[col_fecha_intermedia].dt.month == MES)
@@ -168,7 +168,7 @@ def procesar_todo(df_proyectos, df_intermedia, df_semanal, fechas_mes):
         (df_semanal[col_fecha_semanal].dt.month == MES)
     ]
 
-    # ELIMINAR DUPLICADOS (MISMO DIA)
+    # ELIMINAR DUPLICADOS
     df_intermedia = df_intermedia.drop_duplicates(subset=["Proyecto", col_fecha_intermedia])
     df_semanal = df_semanal.drop_duplicates(subset=["Proyecto", col_fecha_semanal])
 
@@ -184,19 +184,17 @@ def procesar_todo(df_proyectos, df_intermedia, df_semanal, fechas_mes):
     df_intermedia_group.rename(columns={col_fecha_intermedia: "RealIntermedia"}, inplace=True)
     df_semanal_group.rename(columns={col_fecha_semanal: "RealSemanal"}, inplace=True)
 
-    # =========================
-    # MERGE PRINCIPAL (ESTE ES TU EXCEL GRANDE)
-    # =========================
+    # MERGE
     df_detallado = df_proyectos.merge(df_intermedia_group, on="Proyecto", how="left")
     df_detallado = df_detallado.merge(df_semanal_group, on="Proyecto", how="left")
 
     # COINCIDENCIAS
     df_detallado["CoincidenciasIntermedia"] = df_detallado.apply(
-    lambda row: coincidencias_por_semana(row["PosibleIntermedia"], row["RealIntermedia"]), axis=1
+        lambda row: coincidencias_por_semana(row["PosibleIntermedia"], row["RealIntermedia"]), axis=1
     )
 
     df_detallado["CoincidenciasSemanal"] = df_detallado.apply(
-    lambda row: coincidencias_por_semana(row["PosibleSemanal"], row["RealSemanal"]), axis=1
+        lambda row: coincidencias_por_semana(row["PosibleSemanal"], row["RealSemanal"]), axis=1
     )
 
     # CONTEOS
@@ -205,23 +203,19 @@ def procesar_todo(df_proyectos, df_intermedia, df_semanal, fechas_mes):
 
     # CUMPLIMIENTO
     df_detallado["CumplimientoIntermedia"] = np.where(
-        df_detallado["ConteoIntermedia"] == 0,
-        0,
+        df_detallado["ConteoIntermedia"] == 0, 0,
         df_detallado["ConteoCoincidenciasIntermedia"] / df_detallado["ConteoIntermedia"]
     )
 
     df_detallado["CumplimientoSemanal"] = np.where(
-        df_detallado["ConteoSemanal"] == 0,
-        0,
+        df_detallado["ConteoSemanal"] == 0, 0,
         df_detallado["ConteoCoincidenciasSemanal"] / df_detallado["ConteoSemanal"]
     )
 
     df_detallado["CumplimientoIntermedia"] = df_detallado["CumplimientoIntermedia"].clip(upper=1)
     df_detallado["CumplimientoSemanal"] = df_detallado["CumplimientoSemanal"].clip(upper=1)
 
-    # =========================
-    # RESUMEN (EL QUE YA TENÍAS)
-    # =========================
+    # RESUMEN
     comparacion = df_detallado.copy()
 
     return comparacion, df_detallado
